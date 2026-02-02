@@ -1,44 +1,162 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { MapPin, CreditCard, Smartphone, DollarSign, CheckCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { MapPin, CreditCard, Smartphone, DollarSign, CheckCircle, Plus, Loader } from 'lucide-react'
 import { useCart } from '../context/CartContext'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 
 const CheckoutPage = () => {
+  const navigate = useNavigate()
   const { cart, getTotalPrice, clearCart } = useCart()
-  const [selectedAddress, setSelectedAddress] = useState('home')
-  const [paymentMethod, setPaymentMethod] = useState('upi')
+  const { user, setShowAuthModal } = useAuth()
+
+  const [addresses, setAddresses] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('cod')
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [orderId, setOrderId] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+
+  // Add Address State
+  const [isAddingAddress, setIsAddingAddress] = useState(false)
+  const [newAddress, setNewAddress] = useState({
+    name: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    phone: ''
+  })
 
   const subtotal = getTotalPrice()
   const deliveryCharge = cart.length > 0 ? 30 : 0
   const total = subtotal + deliveryCharge
 
-  const addresses = [
-    {
-      id: 'home',
-      name: 'Home',
-      street: '123 Main Street',
-      area: 'Bandra West',
-      city: 'Mumbai',
-      pincode: '400050',
-      phone: '+91 98765 43210'
-    },
-    {
-      id: 'work',
-      name: 'Work',
-      street: '456 Business Park',
-      area: 'Andheri East',
-      city: 'Mumbai',
-      pincode: '400059',
-      phone: '+91 98765 43210'
+  useEffect(() => {
+    if (user) {
+      fetchAddresses()
+    } else {
+      setIsLoading(false)
     }
-  ]
+  }, [user])
 
-  const handlePlaceOrder = () => {
-    setOrderPlaced(true)
-    setTimeout(() => {
+  const fetchAddresses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('addresses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+
+      if (error) throw error
+      setAddresses(data || [])
+      if (data && data.length > 0) {
+        setSelectedAddressId(data[0].id)
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAddAddress = async (e) => {
+    e.preventDefault()
+    try {
+      const { data, error } = await supabase
+        .from('addresses')
+        .insert([{
+          user_id: user.id,
+          ...newAddress,
+          is_default: addresses.length === 0
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setAddresses([...addresses, data])
+      setSelectedAddressId(data.id)
+      setIsAddingAddress(false)
+      setNewAddress({
+        name: '',
+        address_line1: '',
+        address_line2: '',
+        city: '',
+        state: '',
+        pincode: '',
+        phone: ''
+      })
+    } catch (error) {
+      console.error('Error adding address:', error)
+      alert('Failed to add address. Please try again.')
+    }
+  }
+
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      setShowAuthModal(true)
+      return
+    }
+
+    if (!selectedAddressId) {
+      alert('Please select a delivery address')
+      return
+    }
+
+    try {
+      setIsPlacingOrder(true)
+
+      const selectedAddr = addresses.find(a => a.id === selectedAddressId)
+
+      // 1. Create Order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          user_id: user.id,
+          delivery_address: selectedAddr,
+          subtotal,
+          delivery_fee: deliveryCharge,
+          total_amount: total,
+          status: 'pending',
+          payment_method: paymentMethod,
+          payment_status: 'pending'
+        }])
+        .select()
+        .single()
+
+      if (orderError) throw orderError
+
+      // 2. Create Order Items
+      const orderItems = cart.map(item => ({
+        order_id: orderData.id,
+        product_id: item.id,
+        product_name: item.name,
+        product_image_url: item.image,
+        price: item.price,
+        quantity: item.quantity,
+        unit: item.unit,
+        total_price: item.price * item.quantity
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems)
+
+      if (itemsError) throw itemsError
+
+      setOrderId(orderData.order_number)
+      setOrderPlaced(true)
       clearCart()
-    }, 2000)
+
+    } catch (error) {
+      console.error('Error placing order:', error)
+      alert('Failed to place order. Please try again.')
+    } finally {
+      setIsPlacingOrder(false)
+    }
   }
 
   if (orderPlaced) {
@@ -55,7 +173,7 @@ const CheckoutPage = () => {
           <div className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-lg text-left">
               <p className="text-sm text-gray-600">Order ID</p>
-              <p className="font-semibold">ORD-2024-{Math.floor(Math.random() * 10000)}</p>
+              <p className="font-semibold text-xl text-primary-green">{orderId || 'Processing...'}</p>
             </div>
             <Link to="/" className="btn-primary w-full block">
               Continue Shopping
@@ -92,39 +210,71 @@ const CheckoutPage = () => {
               <MapPin className="w-5 h-5" />
               Delivery Address
             </h2>
-            
-            <div className="space-y-3">
-              {addresses.map((address) => (
-                <label key={address.id} className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="address"
-                    value={address.id}
-                    checked={selectedAddress === address.id}
-                    onChange={(e) => setSelectedAddress(e.target.value)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{address.name}</div>
-                    <div className="text-gray-600 text-sm">
-                      {address.street}, {address.area}<br />
-                      {address.city} - {address.pincode}<br />
-                      {address.phone}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
 
-            <button className="mt-4 text-primary-green hover:underline text-sm">
-              + Add New Address
-            </button>
+            {!user ? (
+              <div className="text-center py-6">
+                <p className="text-gray-600 mb-4">Please login to manage addresses</p>
+                <button onClick={() => setShowAuthModal(true)} className="btn-primary">Login Now</button>
+              </div>
+            ) : isLoading ? (
+              <div className="flex justify-center p-4"><Loader className="animate-spin text-primary-green" /></div>
+            ) : (
+              <div className="space-y-4">
+                {addresses.map((address) => (
+                  <label key={address.id} className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg transition-colors ${selectedAddressId === address.id ? 'border-primary-green bg-green-50' : 'hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="address"
+                      value={address.id}
+                      checked={selectedAddressId === address.id}
+                      onChange={(e) => setSelectedAddressId(e.target.value)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{address.name} <span className="text-gray-500 text-sm">({address.address_type})</span></div>
+                      <div className="text-gray-600 text-sm">
+                        {address.address_line1}, {address.address_line2 && `${address.address_line2}, `}<br />
+                        {address.city}, {address.state} - {address.pincode}<br />
+                        Phone: {address.phone}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+
+                {isAddingAddress ? (
+                  <form onSubmit={handleAddAddress} className="mt-4 p-4 border rounded-lg bg-gray-50 space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <input required placeholder="Full Name" className="input-field" value={newAddress.name} onChange={e => setNewAddress({ ...newAddress, name: e.target.value })} />
+                      <input required placeholder="Phone Number" className="input-field" value={newAddress.phone} onChange={e => setNewAddress({ ...newAddress, phone: e.target.value })} />
+                    </div>
+                    <input required placeholder="Address Line 1" className="input-field w-full" value={newAddress.address_line1} onChange={e => setNewAddress({ ...newAddress, address_line1: e.target.value })} />
+                    <input placeholder="Address Line 2" className="input-field w-full" value={newAddress.address_line2} onChange={e => setNewAddress({ ...newAddress, address_line2: e.target.value })} />
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <input required placeholder="City" className="input-field" value={newAddress.city} onChange={e => setNewAddress({ ...newAddress, city: e.target.value })} />
+                      <input required placeholder="State" className="input-field" value={newAddress.state} onChange={e => setNewAddress({ ...newAddress, state: e.target.value })} />
+                      <input required placeholder="Pincode" className="input-field" value={newAddress.pincode} onChange={e => setNewAddress({ ...newAddress, pincode: e.target.value })} />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" onClick={() => setIsAddingAddress(false)} className="px-4 py-2 border rounded hover:bg-gray-200">Cancel</button>
+                      <button type="submit" className="btn-primary">Save Address</button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingAddress(true)}
+                    className="mt-2 flex items-center gap-2 text-primary-green hover:underline font-medium"
+                  >
+                    <Plus className="w-4 h-4" /> Add New Address
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Payment Method */}
           <div className="card p-6">
             <h2 className="text-xl font-bold mb-4">Payment Method</h2>
-            
+
             <div className="space-y-3">
               <label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
                 <input
@@ -178,7 +328,7 @@ const CheckoutPage = () => {
         <div className="lg:col-span-1">
           <div className="card p-6 sticky top-24">
             <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-            
+
             {/* Order Items */}
             <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
               {cart.map((item) => (
@@ -211,9 +361,16 @@ const CheckoutPage = () => {
             {/* Place Order Button */}
             <button
               onClick={handlePlaceOrder}
-              className="btn-primary w-full mt-6"
+              disabled={isPlacingOrder || !user || !selectedAddressId}
+              className={`btn-primary w-full mt-6 flex justify-center items-center gap-2 ${isPlacingOrder || !user || !selectedAddressId ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              Place Order
+              {isPlacingOrder ? (
+                <>Processing <Loader className="w-4 h-4 animate-spin" /></>
+              ) : !user ? (
+                'Login to Place Order'
+              ) : (
+                'Place Order'
+              )}
             </button>
 
             {/* Back to Cart */}

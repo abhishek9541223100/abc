@@ -1,19 +1,53 @@
 import { useParams, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Minus, ShoppingCart, ArrowLeft, Clock, CheckCircle } from 'lucide-react'
 import { useCart } from '../context/CartContext'
-import { fetchAdminData } from '../data/mockData'
+import { supabase } from '../lib/supabaseClient'
 
 const ProductDetailPage = () => {
   const { productId } = useParams()
   const { addToCart } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
+  const [product, setProduct] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Find product across all categories from admin data
-  const adminData = fetchAdminData()
-  const allProducts = Object.values(adminData.products).flat()
-  const product = allProducts.find(p => p.id === parseInt(productId))
+  useEffect(() => {
+    fetchProduct()
+  }, [productId])
+
+  const fetchProduct = async () => {
+    try {
+      setIsLoading(true)
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, categories(slug, name)')
+        .eq('id', productId)
+        .single()
+
+      if (error) throw error
+
+      setProduct({
+        ...data,
+        image: data.image_url,
+        inStock: data.stock_quantity > 0,
+        discount: data.discount_percentage,
+        category: data.categories?.slug,
+      })
+    } catch (error) {
+      console.error('Error fetching product:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-primary-green border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
+  }
 
   if (!product) {
     return (
@@ -34,14 +68,14 @@ const ProductDetailPage = () => {
     setTimeout(() => setAddedToCart(false), 2000)
   }
 
-  const discountedPrice = product.discount > 0 
+  const discountedPrice = product.discount > 0
     ? Math.round(product.price * (1 - product.discount / 100))
     : product.price
 
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Back Button */}
-      <Link 
+      <Link
         to={`/category/${product.category}`}
         className="inline-flex items-center gap-2 text-gray-600 hover:text-primary-green mb-6"
       >
@@ -67,7 +101,7 @@ const ProductDetailPage = () => {
         {/* Product Details */}
         <div>
           <h1 className="text-3xl font-bold font-poppins mb-4">{product.name}</h1>
-          
+
           <p className="text-gray-600 text-lg mb-6">{product.description}</p>
 
           {/* Stock Status */}
@@ -132,13 +166,12 @@ const ProductDetailPage = () => {
                 <Plus className="w-4 h-4" />
               </button>
             </div>
-            
+
             <button
               onClick={handleAddToCart}
               disabled={!product.inStock}
-              className={`btn-primary flex-1 flex items-center justify-center gap-2 py-3 ${
-                !product.inStock ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`btn-primary flex-1 flex items-center justify-center gap-2 py-3 ${!product.inStock ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               <ShoppingCart className="w-5 h-5" />
               {addedToCart ? 'Added!' : 'Add to Cart'}

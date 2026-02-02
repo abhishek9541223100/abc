@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Search, Package, ShoppingCart, Users, TrendingUp, Eye, CheckCircle, XCircle, Clock, UserCheck, UserX, Mail, Phone, Calendar, Award, Star, Target, TrendingDown, Upload, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Package, ShoppingCart, Users, TrendingUp, Eye, CheckCircle, XCircle, Clock, UserCheck, UserX, Mail, Phone, Calendar, Award, Star, Target, TrendingDown, Upload, X, RefreshCw } from 'lucide-react'
 
 const AdminPanel = () => {
   const [products, setProducts] = useState([])
@@ -109,6 +109,18 @@ const AdminPanel = () => {
         },
         {
           id: 3,
+          name: 'Fresh Spinach',
+          category: 'fruits-vegetables',
+          price: 40,
+          quantity: 30,
+          image: 'https://images.unsplash.com/photo-1574386312658-830c5b77d4c5?w=300',
+          unit: 'bunch',
+          description: 'Nutritious fresh spinach leaves',
+          discount: 5,
+          inStock: true
+        },
+        {
+          id: 4,
           name: 'Fresh Milk',
           category: 'dairy-bakery',
           price: 60,
@@ -117,6 +129,126 @@ const AdminPanel = () => {
           unit: 'liter',
           description: 'Pure and fresh cow milk',
           discount: 0,
+          inStock: true
+        },
+        {
+          id: 5,
+          name: 'White Bread',
+          category: 'dairy-bakery',
+          price: 45,
+          quantity: 25,
+          image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300',
+          unit: 'loaf',
+          description: 'Soft and fresh white bread',
+          discount: 0,
+          inStock: true
+        },
+        {
+          id: 6,
+          name: 'Greek Yogurt',
+          category: 'dairy-bakery',
+          price: 90,
+          quantity: 20,
+          image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300',
+          unit: '500g',
+          description: 'Creamy and healthy Greek yogurt',
+          discount: 15,
+          inStock: true
+        },
+        {
+          id: 7,
+          name: 'Potato Chips',
+          category: 'snacks-beverages',
+          price: 50,
+          quantity: 40,
+          image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=300',
+          unit: 'pack',
+          description: 'Crispy and flavorful potato chips',
+          discount: 0,
+          inStock: true
+        },
+        {
+          id: 8,
+          name: 'Orange Juice',
+          category: 'snacks-beverages',
+          price: 120,
+          quantity: 25,
+          image: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=300',
+          unit: 'liter',
+          description: 'Fresh and tangy orange juice',
+          discount: 10,
+          inStock: true
+        },
+        {
+          id: 9,
+          name: 'Dish Soap',
+          category: 'household',
+          price: 85,
+          quantity: 15,
+          image: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300',
+          unit: 'bottle',
+          description: 'Effective dish cleaning liquid',
+          discount: 0,
+          inStock: true
+        },
+        {
+          id: 10,
+          name: 'Paper Towels',
+          category: 'household',
+          price: 150,
+          quantity: 20,
+          image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300',
+          unit: 'roll',
+          description: 'Absorbent paper towels for kitchen',
+          discount: 5,
+          inStock: true
+        },
+        {
+          id: 11,
+          name: 'Hand Soap',
+          category: 'personal-care',
+          price: 75,
+          quantity: 30,
+          image: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300',
+          unit: 'bottle',
+          description: 'Gentle hand soap with moisturizer',
+          discount: 0,
+          inStock: true
+        },
+        {
+          id: 12,
+          name: 'Shampoo',
+          category: 'personal-care',
+          price: 200,
+          quantity: 18,
+          image: 'https://images.unsplash.com/photo-1526947425969-112a8a8c0b67?w=300',
+          unit: 'bottle',
+          description: 'Nourishing shampoo for all hair types',
+          discount: 20,
+          inStock: true
+        },
+        {
+          id: 13,
+          name: 'Instant Noodles',
+          category: 'instant-food',
+          price: 35,
+          quantity: 50,
+          image: 'https://images.unsplash.com/photo-1617093727343-374698b1b08d?w=300',
+          unit: 'pack',
+          description: 'Quick and delicious instant noodles',
+          discount: 0,
+          inStock: true
+        },
+        {
+          id: 14,
+          name: 'Ready to Eat Rice',
+          category: 'instant-food',
+          price: 80,
+          quantity: 22,
+          image: 'https://images.unsplash.com/photo-1536304993881-ff1e9d3a9c3c?w=300',
+          unit: 'pack',
+          description: 'Convenient ready-to-eat rice meal',
+          discount: 10,
           inStock: true
         }
       ]
@@ -243,7 +375,8 @@ const AdminPanel = () => {
       image: product.image,
       unit: product.unit || 'kg',
       description: product.description || '',
-      discount: product.discount || 0
+      discount: product.discount || 0,
+      featured: product.featured || false
     })
     setImagePreview(product.image || '')
     setShowAddForm(true)
@@ -308,6 +441,47 @@ const AdminPanel = () => {
     setImagePreview('')
     setFormData(prev => ({ ...prev, image: '' }))
     setUploadError('')
+  }
+
+  const refreshData = () => {
+    // Force re-initialization and data reload
+    initializeData()
+    loadData()
+    setMessage('Data refreshed successfully!')
+    setTimeout(() => setMessage(''), 2000)
+  }
+
+  const resetAllData = () => {
+    if (window.confirm('Are you sure you want to reset all data? This will clear all products and restore defaults.')) {
+      // Clear all localStorage data
+      localStorage.removeItem('anynow_products')
+      localStorage.removeItem('anynow_categories')
+      localStorage.removeItem('anynow_pan_products')
+      localStorage.removeItem('anynow_liquor_products')
+      
+      // Re-initialize with default data
+      initializeData()
+      loadData()
+      
+      setMessage('All data has been reset to defaults!')
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
+  const syncWithWebsite = () => {
+    // Force sync by triggering storage events
+    window.dispatchEvent(new Event('storage'))
+    window.dispatchEvent(new StorageEvent('storage', { 
+      key: 'anynow_products',
+      newValue: localStorage.getItem('anynow_products')
+    }))
+    window.dispatchEvent(new StorageEvent('storage', { 
+      key: 'anynow_categories',
+      newValue: localStorage.getItem('anynow_categories')
+    }))
+    
+    setMessage('Data synced with website!')
+    setTimeout(() => setMessage(''), 2000)
   }
 
   const handlePanEdit = (product) => {
@@ -1017,7 +1191,20 @@ const AdminPanel = () => {
           
           {products.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No products found. Add your first product to get started.
+              <div className="mb-4">
+                <Package className="w-16 h-16 text-gray-300 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-700 mb-2">No products found</h3>
+              <p className="text-gray-500 mb-4">
+                The products table is completely empty. Click "Add Product" to get started.
+              </p>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Your First Product
+              </button>
             </div>
           )}
         </div>
@@ -1037,7 +1224,7 @@ const AdminPanel = () => {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold text-gray-900">AnyNow Admin Panel</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Kathua Fresh – Admin Panel</h1>
             <a 
               href="/"
               className="text-blue-600 hover:text-blue-800"
@@ -1153,15 +1340,57 @@ const AdminPanel = () => {
         {activeTab === 'products' && (
           <div>
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Grocery Product Management</h2>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Product
-              </button>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">Grocery Product Management</h2>
+                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                  {products.length} Products
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={syncWithWebsite}
+                  className="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 flex items-center"
+                  title="Sync data with website"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Sync
+                </button>
+                <button
+                  onClick={refreshData}
+                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center"
+                  title="Refresh data"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </button>
+                <button
+                  onClick={resetAllData}
+                  className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 flex items-center"
+                  title="Reset all data (use with caution)"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Reset
+                </button>
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </button>
+              </div>
             </div>
+
+            {/* Success/Error Message */}
+            {message && (
+              <div className={`mx-6 mt-4 p-3 rounded-lg text-sm ${
+                message.includes('successfully') 
+                  ? 'bg-green-100 text-green-800 border border-green-300' 
+                  : 'bg-red-100 text-red-800 border border-red-300'
+              }`}>
+                {message}
+              </div>
+            )}
 
             {/* Add/Edit Product Form */}
             {showAddForm && (
@@ -1453,7 +1682,20 @@ const AdminPanel = () => {
               
               {products.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No products found. Add your first product to get started.
+                  <div className="mb-4">
+                    <Package className="w-16 h-16 text-gray-300 mx-auto" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">No products found</h3>
+                  <p className="text-gray-500 mb-4">
+                    The products table is completely empty. Click "Add Product" to get started.
+                  </p>
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Product
+                  </button>
                 </div>
               )}
             </div>

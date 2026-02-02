@@ -1,37 +1,54 @@
 import { useState } from 'react'
 import { User, ShoppingBag, MapPin, Settings, LogOut, Package, Clock, CheckCircle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 
 const AccountPage = () => {
   const [activeTab, setActiveTab] = useState('orders')
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const { user, setShowAuthModal, handleLogout } = useAuth()
+  const [orders, setOrders] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock order data
-  const orders = [
-    {
-      id: 'ORD-2024-1234',
-      date: '2024-01-15',
-      status: 'delivered',
-      total: 450,
-      items: 5,
-      deliveryTime: '12 minutes'
-    },
-    {
-      id: 'ORD-2024-1235',
-      date: '2024-01-16',
-      status: 'delivered',
-      total: 320,
-      items: 3,
-      deliveryTime: '15 minutes'
-    },
-    {
-      id: 'ORD-2024-1236',
-      date: '2024-01-17',
-      status: 'pending',
-      total: 280,
-      items: 4,
-      deliveryTime: '10-15 minutes'
+  useEffect(() => {
+    if (user) {
+      fetchOrders()
     }
-  ]
+  }, [user])
+
+  const fetchOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            product_id,
+            total_price
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      const mappedOrders = data.map(order => ({
+        id: order.order_number || order.id,
+        date: new Date(order.created_at).toLocaleDateString(),
+        status: order.status,
+        total: order.total_amount,
+        items: order.order_items?.length || 0,
+        deliveryTime: order.estimated_delivery_time ? `${order.estimated_delivery_time} mins` : '15 mins'
+      }))
+
+      setOrders(mappedOrders)
+    } catch (error) {
+      console.error('Error fetching orders:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
 
   // Mock addresses
   const addresses = [
@@ -68,24 +85,18 @@ const AccountPage = () => {
       </div>
 
       <div className="card p-6">
-        <h3 className="text-lg font-semibold mb-4">Login / Signup</h3>
-        
+        <h3 className="text-lg font-semibold mb-4 text-center">Login to Continue</h3>
+
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mobile Number
-            </label>
-            <input
-              type="tel"
-              placeholder="Enter your mobile number"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-green"
-            />
-          </div>
-          
-          <button className="btn-primary w-full">
-            Send OTP
+          <p className="text-center text-gray-500">Please login or signup to view your orders and profile.</p>
+
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="btn-primary w-full"
+          >
+            Login / Signup
           </button>
-          
+
           <div className="text-center text-sm text-gray-600">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </div>
@@ -118,7 +129,7 @@ const AccountPage = () => {
               )}
             </div>
           </div>
-          
+
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-600">
               {order.items} items • Delivered in {order.deliveryTime}
@@ -140,7 +151,7 @@ const AccountPage = () => {
           + Add Address
         </button>
       </div>
-      
+
       {addresses.map((address) => (
         <div key={address.id} className="card p-6">
           <div className="flex justify-between items-start">
@@ -182,7 +193,7 @@ const AccountPage = () => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-green"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
@@ -193,7 +204,7 @@ const AccountPage = () => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-green"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Phone
@@ -204,7 +215,7 @@ const AccountPage = () => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-green"
           />
         </div>
-        
+
         <button className="btn-primary w-full">
           Save Changes
         </button>
@@ -212,7 +223,7 @@ const AccountPage = () => {
     </div>
   )
 
-  if (!isLoggedIn) {
+  if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoginSection />
@@ -235,45 +246,45 @@ const AccountPage = () => {
                 <div className="text-sm text-gray-600">+91 98765 43210</div>
               </div>
             </div>
-            
+
             <nav className="space-y-2">
               <button
                 onClick={() => setActiveTab('orders')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
-                  activeTab === 'orders' 
-                    ? 'bg-primary-green text-white' 
-                    : 'hover:bg-gray-100'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${activeTab === 'orders'
+                  ? 'bg-primary-green text-white'
+                  : 'hover:bg-gray-100'
+                  }`}
               >
                 <Package className="w-4 h-4" />
                 Orders
               </button>
-              
+
               <button
                 onClick={() => setActiveTab('addresses')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
-                  activeTab === 'addresses' 
-                    ? 'bg-primary-green text-white' 
-                    : 'hover:bg-gray-100'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${activeTab === 'addresses'
+                  ? 'bg-primary-green text-white'
+                  : 'hover:bg-gray-100'
+                  }`}
               >
                 <MapPin className="w-4 h-4" />
                 Addresses
               </button>
-              
+
               <button
                 onClick={() => setActiveTab('profile')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
-                  activeTab === 'profile' 
-                    ? 'bg-primary-green text-white' 
-                    : 'hover:bg-gray-100'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${activeTab === 'profile'
+                  ? 'bg-primary-green text-white'
+                  : 'hover:bg-gray-100'
+                  }`}
               >
                 <Settings className="w-4 h-4" />
                 Profile
               </button>
-              
-              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-gray-100 text-red-500">
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-gray-100 text-red-500"
+              >
                 <LogOut className="w-4 h-4" />
                 Logout
               </button>

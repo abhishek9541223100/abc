@@ -31,6 +31,9 @@ export const CartProvider = ({ children }) => {
       }
       return [...prevCart, { ...product, quantity }]
     })
+    
+    // Trigger cart animation event
+    window.dispatchEvent(new CustomEvent('cartUpdated'))
   }
 
   const removeFromCart = (productId) => {

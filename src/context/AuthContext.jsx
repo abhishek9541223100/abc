@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext()
 
@@ -12,9 +13,10 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
+  const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showAuthModal, setShowAuthModal] = useState(false)
-  const [isLogin, setIsLogin] = useState(true)
+  const [isLogin, setIsLogin] = useState(true) // Toggle between Login and Signup
   const [message, setMessage] = useState('')
   const [formData, setFormData] = useState({
     name: '',
@@ -23,105 +25,130 @@ export const AuthProvider = ({ children }) => {
     confirmPassword: ''
   })
 
-  // Check login state on mount
+  // Initialize Supabase Auth
   useEffect(() => {
-    const savedUser = localStorage.getItem('anynow_user')
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser)
-        setUser(parsed)
-      } catch (error) {
-        console.error('Error parsing saved user:', error)
-        localStorage.removeItem('anynow_user')
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+      } else {
+        setUser(null)
+        setIsLoading(false)
       }
-    }
-    setIsLoading(false)
+    })
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+      } else {
+        setUser(null)
+        setIsLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // Save user state to localStorage whenever it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('anynow_user', JSON.stringify(user))
-    } else {
-      localStorage.removeItem('anynow_user')
-    }
-  }, [user])
+  const fetchProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-  const handleAuthSubmit = (e) => {
-    e.preventDefault()
-    setMessage('')
-
-    if (isLogin) {
-      // Login logic
-      const { email, password } = formData
-      
-      if (!email || !password) {
-        setMessage('Please fill in all fields')
-        return
+      if (error) {
+        console.error('Error fetching profile:', error)
       }
 
-      // Simple authentication (in production, use real API)
-      const users = JSON.parse(localStorage.getItem('anynow_users') || '[]')
-      const foundUser = users.find(u => u.email === email && u.password === password)
+      // Combine auth user metadata with profile data
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      setUser({ ...authUser, ...data })
+    } catch (error) {
+      console.error('Profile fetch error:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-      if (foundUser) {
-        setUser({ name: foundUser.name, email: foundUser.email })
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    setIsLoading(true)
+
+    const { name, email, password, confirmPassword } = formData
+
+    try {
+      if (isLogin) {
+        // Login Logic
+        if (!email || !password) {
+          throw new Error('Please fill in all fields')
+        }
+
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+
+        if (error) throw error
+
         setShowAuthModal(false)
         setMessage('Login successful!')
         resetForm()
-        
-        // Clear message after 3 seconds
-        setTimeout(() => setMessage(''), 3000)
       } else {
-        setMessage('Invalid email or password')
-      }
-    } else {
-      // Signup logic
-      const { name, email, password, confirmPassword } = formData
-      
-      if (!name || !email || !password || !confirmPassword) {
-        setMessage('Please fill in all fields')
-        return
-      }
+        // Signup Logic
+        if (!name || !email || !password || !confirmPassword) {
+          throw new Error('Please fill in all fields')
+        }
 
-      if (password !== confirmPassword) {
-        setMessage('Passwords do not match')
-        return
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match')
+        }
+
+        if (password.length < 6) {
+          throw new Error('Password must be at least 6 characters')
+        }
+
+        // Sign up with metadata
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name }
+          }
+        })
+
+        if (error) throw error
+
+        setShowAuthModal(false)
+        setMessage('Signup successful! Check your email for confirmation.') // If email confirm enabled
+        // If email confirm is disabled, they are logged in automatically
+        resetForm()
       }
-
-      if (password.length < 6) {
-        setMessage('Password must be at least 6 characters')
-        return
-      }
-
-      // Check if user already exists
-      const users = JSON.parse(localStorage.getItem('anynow_users') || '[]')
-      if (users.find(u => u.email === email)) {
-        setMessage('User with this email already exists')
-        return
-      }
-
-      // Create new user
-      const newUser = { name, email, password }
-      users.push(newUser)
-      localStorage.setItem('anynow_users', JSON.stringify(users))
-
-      setUser({ name, email })
-      setShowAuthModal(false)
-      setMessage('Signup successful!')
-      resetForm()
-      
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setIsLoading(false)
       // Clear message after 3 seconds
       setTimeout(() => setMessage(''), 3000)
     }
   }
 
-  const handleLogout = () => {
-    setUser(null)
-    setMessage('Logged out successfully!')
-    
-    // Clear message after 3 seconds
-    setTimeout(() => setMessage(''), 3000)
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
+      setUser(null)
+      setSession(null)
+      setMessage('Logged out successfully!')
+      setTimeout(() => setMessage(''), 3000)
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   const resetForm = () => {
@@ -141,6 +168,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    session,
     isLoading,
     showAuthModal,
     isLogin,

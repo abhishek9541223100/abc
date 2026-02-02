@@ -12,7 +12,9 @@ const LocationModal = () => {
     searchLocations,
     selectLocation,
     isLoading,
-    requestLocationPermission
+    requestLocationPermission,
+    permissionStatus,
+    retryLocationDetection
   } = useLocation()
 
   if (!showLocationModal) return null
@@ -24,7 +26,103 @@ const LocationModal = () => {
   }
 
   const handleAutoDetect = () => {
-    requestLocationPermission()
+    // Explicit onClick handler that calls navigator.geolocation.getCurrentPosition
+    if (!('geolocation' in navigator)) {
+      alert('Location not supported')
+      return
+    }
+
+    setIsLoading(true)
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          console.log('Location detected:', latitude, longitude)
+          
+          // Get city from coordinates (using the same function from context)
+          const city = await getCityFromCoordinates(latitude, longitude)
+          const newLocation = { city, area: 'Current Location' }
+          
+          // Update location in context
+          selectLocation(city, 'Current Location')
+          setIsLoading(false)
+          
+          // Close modal after successful detection
+          setShowLocationModal(false)
+          
+        } catch (error) {
+          console.error('Error getting city from coordinates:', error)
+          setIsLoading(false)
+          alert('Unable to detect location. Please select manually.')
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error)
+        setIsLoading(false)
+        alert('Unable to detect location. Please select manually.')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000
+      }
+    )
+  }
+
+  const getCityFromCoordinates = async (lat, lon) => {
+    // Same city detection logic from LocationContext
+    const cities = [
+      { name: 'Mumbai', lat: 19.0760, lon: 72.8777, range: 0.5 },
+      { name: 'Delhi', lat: 28.6139, lon: 77.2090, range: 0.5 },
+      { name: 'Bangalore', lat: 12.9716, lon: 77.5946, range: 0.5 },
+      { name: 'Chennai', lat: 13.0827, lon: 80.2707, range: 0.5 },
+      { name: 'Kolkata', lat: 22.5726, lon: 88.3639, range: 0.5 },
+      { name: 'Hyderabad', lat: 17.3850, lon: 78.4867, range: 0.5 },
+      { name: 'Pune', lat: 18.5204, lon: 73.8567, range: 0.5 },
+      { name: 'Ahmedabad', lat: 23.0225, lon: 72.5714, range: 0.5 },
+      { name: 'Jaipur', lat: 26.9124, lon: 75.7873, range: 0.5 },
+      { name: 'Lucknow', lat: 26.8467, lon: 80.9462, range: 0.5 },
+      { name: 'Kanpur', lat: 26.4499, lon: 80.3319, range: 0.5 },
+      { name: 'Nagpur', lat: 21.1458, lon: 79.0882, range: 0.5 },
+      { name: 'Indore', lat: 22.7196, lon: 75.8577, range: 0.5 },
+      { name: 'Thane', lat: 19.2183, lon: 72.9781, range: 0.5 },
+      { name: 'Bhopal', lat: 23.2599, lon: 77.4126, range: 0.5 },
+      { name: 'Visakhapatnam', lat: 17.6868, lon: 83.2185, range: 0.5 },
+      { name: 'Patna', lat: 25.5941, lon: 85.1376, range: 0.5 },
+      { name: 'Vadodara', lat: 22.3072, lon: 73.1812, range: 0.5 },
+      { name: 'Agra', lat: 27.1767, lon: 78.0081, range: 0.5 },
+      { name: 'Nashik', lat: 19.9975, lon: 73.7898, range: 0.5 }
+    ]
+
+    // Find closest city
+    let closestCity = null
+    let minDistance = Infinity
+
+    cities.forEach(city => {
+      const distance = Math.sqrt(
+        Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
+      )
+      if (distance < minDistance && distance < city.range) {
+        minDistance = distance
+        closestCity = city
+      }
+    })
+
+    // If no city found within range, return the closest one
+    if (!closestCity && cities.length > 0) {
+      cities.forEach(city => {
+        const distance = Math.sqrt(
+          Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2)
+        )
+        if (distance < minDistance) {
+          minDistance = distance
+          closestCity = city
+        }
+      })
+    }
+
+    return closestCity ? closestCity.name : 'Mumbai'
   }
 
   const handleSelectLocation = (city, area) => {
@@ -48,6 +146,7 @@ const LocationModal = () => {
         {/* Auto-detect Option */}
         <div className="p-4 border-b">
           <button
+            type="button"
             onClick={handleAutoDetect}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 p-3 bg-primary-green text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -57,8 +156,20 @@ const LocationModal = () => {
             ) : (
               <MapPin className="w-4 h-4" />
             )}
-            <span>{isLoading ? 'Detecting...' : 'Auto-detect Location'}</span>
+            <span>
+              {isLoading 
+                ? 'Detecting...' 
+                : permissionStatus === 'denied' 
+                  ? 'Try Auto-detect Again' 
+                  : 'Auto-detect Location'
+              }
+            </span>
           </button>
+          {permissionStatus === 'denied' && (
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Location access was denied. Click above to try again or select manually.
+            </p>
+          )}
         </div>
 
         {/* Search */}

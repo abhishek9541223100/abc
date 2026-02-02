@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ShoppingCart, Apple, Milk, Cookie, Home, Heart, Pizza } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { fetchAdminData } from '../data/mockData'
+
 import FeaturedProducts from '../components/FeaturedProducts'
 
 const getIconForCategory = (slug) => {
@@ -40,23 +40,35 @@ const getBackgroundImageForCategory = (slug) => {
   return imageMap[slug] || null
 }
 
+import { supabase } from '../lib/supabaseClient'
+
 const Homepage = () => {
   const [categories, setCategories] = useState([])
 
   useEffect(() => {
-    // Load categories from admin panel
-    const data = fetchAdminData()
-    if (data.categories && data.categories.length > 0) {
-      setCategories(data.categories)
-    }
+    fetchCategories()
   }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name')
+
+      if (error) throw error
+      if (data) setCategories(data)
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
 
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-r from-primary-green to-green-600 text-white py-20 overflow-hidden">
         {/* Background Image with Blur */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: 'url(/public-image.jpg)',
@@ -64,10 +76,10 @@ const Homepage = () => {
             transform: 'scale(1.05)'
           }}
         />
-        
+
         {/* Overlay for better text visibility */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
-        
+
         {/* Content */}
         <div className="relative z-10 container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-6xl font-bold font-poppins mb-4 text-white drop-shadow-lg">
@@ -100,10 +112,9 @@ const Homepage = () => {
                   to={`/category/${category.slug}`}
                   className="group"
                 >
-                  <div 
-                    className={`${categoryColor} rounded-lg p-6 text-center hover:shadow-lg transition-all group-hover:scale-105 relative overflow-hidden ${
-                      hasBackgroundImage ? 'min-h-[140px]' : ''
-                    }`}
+                  <div
+                    className={`${categoryColor} rounded-lg p-6 text-center hover:shadow-lg transition-all group-hover:scale-105 relative overflow-hidden ${hasBackgroundImage ? 'min-h-[140px]' : ''
+                      }`}
                     style={{
                       backgroundImage: backgroundImage,
                       backgroundSize: 'cover',
@@ -115,20 +126,18 @@ const Homepage = () => {
                     {hasBackgroundImage && (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40" />
                     )}
-                    
+
                     <div className={`relative z-10 ${hasBackgroundImage ? 'text-white' : ''}`}>
                       <div className="flex justify-center mb-4">
-                        <IconComponent className={`w-12 h-12 ${
-                          hasBackgroundImage 
-                            ? 'text-white drop-shadow-lg' 
-                            : 'text-primary-green'
-                        }`} />
+                        <IconComponent className={`w-12 h-12 ${hasBackgroundImage
+                          ? 'text-white drop-shadow-lg'
+                          : 'text-primary-green'
+                          }`} />
                       </div>
-                      <h3 className={`font-semibold text-sm ${
-                        hasBackgroundImage
-                          ? 'text-white drop-shadow-md font-bold'
-                          : 'text-gray-800 group-hover:text-primary-green'
-                      }`}>
+                      <h3 className={`font-semibold text-sm ${hasBackgroundImage
+                        ? 'text-white drop-shadow-md font-bold'
+                        : 'text-gray-800 group-hover:text-primary-green'
+                        }`}>
                         {category.name}
                       </h3>
                     </div>
@@ -151,7 +160,7 @@ const Homepage = () => {
           </h2>
           <div className="grid md:grid-cols-2 gap-8">
             {/* Pan Corner Card */}
-            <div 
+            <div
               onClick={() => window.open('https://wa.me/9541223100?text=Hello,%20I%20want%20to%20order%20from%20Pan%20Corner.', '_blank')}
               className="group cursor-pointer"
             >
@@ -173,7 +182,7 @@ const Homepage = () => {
             </div>
 
             {/* Liquor Corner Card */}
-            <div 
+            <div
               onClick={() => window.open('https://wa.me/9541223100?text=Hello,%20I%20want%20to%20order%20from%20Liquor%20Corner.', '_blank')}
               className="group cursor-pointer"
             >
@@ -228,7 +237,7 @@ const Homepage = () => {
       <section className="py-16">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12 font-poppins">
-            Why Choose AnyNow?
+            Why Choose Kathua Fresh?
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
